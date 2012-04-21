@@ -380,7 +380,7 @@ PVR_ERROR CPVRClient::GetEPGForChannel(const CPVRChannel &channel, CEpg *epg, ti
     PVR_CHANNEL addonChannel;
     PVRWriteClientChannelInfo(channel, addonChannel);
 
-    PVR_HANDLE_STRUCT handle;
+    ADDON_HANDLE_STRUCT handle;
     handle.callerAddress = this;
     handle.dataAddress = (CEpg*) epg;
     handle.dataIdentifier = bSaveInDb ? 1 : 0; // used by the callback method CAddonCallbacksPVR::PVRTransferEpgEntry()
@@ -433,7 +433,7 @@ PVR_ERROR CPVRClient::GetChannelGroups(CPVRChannelGroups *groups)
 
   try
   {
-    PVR_HANDLE_STRUCT handle;
+    ADDON_HANDLE_STRUCT handle;
     handle.callerAddress = this;
     handle.dataAddress = groups;
     retVal = m_pStruct->GetChannelGroups(&handle, groups->IsRadio());
@@ -460,7 +460,7 @@ PVR_ERROR CPVRClient::GetChannelGroupMembers(CPVRChannelGroup *group)
 
   try
   {
-    PVR_HANDLE_STRUCT handle;
+    ADDON_HANDLE_STRUCT handle;
     handle.callerAddress = this;
     handle.dataAddress = group;
 
@@ -513,7 +513,7 @@ PVR_ERROR CPVRClient::GetChannels(CPVRChannelGroup &channels, bool radio)
 
   try
   {
-    PVR_HANDLE_STRUCT handle;
+    ADDON_HANDLE_STRUCT handle;
     handle.callerAddress = this;
     handle.dataAddress = (CPVRChannelGroup*) &channels;
     retVal = m_pStruct->GetChannels(&handle, radio);
@@ -562,7 +562,7 @@ PVR_ERROR CPVRClient::GetRecordings(CPVRRecordings *results)
 
   try
   {
-    PVR_HANDLE_STRUCT handle;
+    ADDON_HANDLE_STRUCT handle;
     handle.callerAddress = this;
     handle.dataAddress = (CPVRRecordings*) results;
     retVal = m_pStruct->GetRecordings(&handle);
@@ -665,7 +665,7 @@ PVR_ERROR CPVRClient::GetTimers(CPVRTimers *results)
 
   try
   {
-    PVR_HANDLE_STRUCT handle;
+    ADDON_HANDLE_STRUCT handle;
     handle.callerAddress = this;
     handle.dataAddress = (CPVRTimers*) results;
     retVal = m_pStruct->GetTimers(&handle);
