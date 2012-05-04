@@ -69,11 +69,13 @@ void CPVRClient::ResetProperties(int iClientId /* = PVR_INVALID_CLIENT_ID */)
 
   m_menuhooks.clear();
   m_bReadyToUse           = false;
-  m_iClientId             = PVR_INVALID_CLIENT_ID;
+  m_iClientId             = iClientId;
   m_strBackendVersion     = DEFAULT_INFO_STRING_VALUE;
   m_strConnectionString   = DEFAULT_INFO_STRING_VALUE;
   m_strFriendlyName       = DEFAULT_INFO_STRING_VALUE;
   m_strBackendName        = DEFAULT_INFO_STRING_VALUE;
+  m_bIsPlayingTV          = false;
+  m_bIsPlayingRecording   = false;
   ResetAddonCapabilities(m_addonCapabilities);
 }
 
@@ -138,6 +140,9 @@ bool CPVRClient::GetAddonProperties(void)
 
 bool CPVRClient::Create(int iClientId)
 {
+  if (iClientId <= PVR_INVALID_CLIENT_ID || iClientId == PVR_VIRTUAL_CLIENT_ID)
+    return false;
+
   /* ensure that a previous instance is destroyed */
   Destroy();
 
@@ -190,8 +195,7 @@ void CPVRClient::ReCreate(void)
   }
 
   /* recreate the instance */
-  if (iClientID != PVR_INVALID_CLIENT_ID)
-    Create(iClientID);
+  Create(iClientID);
 }
 
 bool CPVRClient::ReadyToUse(void) const
@@ -327,7 +331,7 @@ PVR_ERROR CPVRClient::StartChannelScan(void)
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if (!m_addonCapabilities.bSupportsChannelScan)
+  if (!SupportsChannelScan())
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   try { return m_pStruct->DialogChannelScan(); }
@@ -350,7 +354,7 @@ PVR_ERROR CPVRClient::GetEPGForChannel(const CPVRChannel &channel, CEpg *epg, ti
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if (!m_addonCapabilities.bSupportsEPG)
+  if (!SupportsEPG())
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   PVR_ERROR retVal(PVR_ERROR_UNKNOWN);
@@ -382,7 +386,7 @@ int CPVRClient::GetChannelGroupsAmount(void)
 {
   int iReturn(-EINVAL);
 
-  if (ReadyToUse() && m_addonCapabilities.bSupportsChannelGroups)
+  if (ReadyToUse() && SupportsChannelGroups())
   {
     try { iReturn = m_pStruct->GetChannelGroupsAmount(); }
     catch (exception &e) { LogException(e, "GetChannelGroupsAmount()"); }
@@ -396,7 +400,7 @@ PVR_ERROR CPVRClient::GetChannelGroups(CPVRChannelGroups *groups)
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if (!m_addonCapabilities.bSupportsChannelGroups)
+  if (!SupportsChannelGroups())
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   PVR_ERROR retVal(PVR_ERROR_UNKNOWN);
@@ -422,7 +426,7 @@ PVR_ERROR CPVRClient::GetChannelGroupMembers(CPVRChannelGroup *group)
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if (!m_addonCapabilities.bSupportsChannelGroups)
+  if (!SupportsChannelGroups())
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   PVR_ERROR retVal(PVR_ERROR_UNKNOWN);
@@ -453,7 +457,7 @@ int CPVRClient::GetChannelsAmount(void)
 {
   int iReturn(-EINVAL);
 
-  if (ReadyToUse() && (m_addonCapabilities.bSupportsTV || m_addonCapabilities.bSupportsRadio))
+  if (ReadyToUse() && (SupportsTV() || SupportsRadio()))
   {
     try { iReturn = m_pStruct->GetChannelsAmount(); }
     catch (exception &e) { LogException(e, "GetChannelsAmount()"); }
@@ -467,8 +471,8 @@ PVR_ERROR CPVRClient::GetChannels(CPVRChannelGroup &channels, bool radio)
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if ((!m_addonCapabilities.bSupportsRadio && radio) ||
-      (!m_addonCapabilities.bSupportsTV && !radio))
+  if ((!SupportsRadio() && radio) ||
+      (!SupportsTV() && !radio))
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   PVR_ERROR retVal(PVR_ERROR_UNKNOWN);
@@ -493,7 +497,7 @@ int CPVRClient::GetRecordingsAmount(void)
 {
   int iReturn(-EINVAL);
 
-  if (ReadyToUse() && m_addonCapabilities.bSupportsRecordings)
+  if (ReadyToUse() && SupportsRecordings())
   {
     try { iReturn = m_pStruct->GetRecordingsAmount(); }
     catch (exception &e) { LogException(e, "GetRecordingsAmount()"); }
@@ -507,7 +511,7 @@ PVR_ERROR CPVRClient::GetRecordings(CPVRRecordings *results)
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if (!m_addonCapabilities.bSupportsRecordings)
+  if (!SupportsRecordings())
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   PVR_ERROR retVal(PVR_ERROR_UNKNOWN);
@@ -533,7 +537,7 @@ PVR_ERROR CPVRClient::DeleteRecording(const CPVRRecording &recording)
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if (!m_addonCapabilities.bSupportsRecordings)
+  if (!SupportsRecordings())
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   PVR_ERROR retVal(PVR_ERROR_UNKNOWN);
@@ -559,7 +563,7 @@ PVR_ERROR CPVRClient::RenameRecording(const CPVRRecording &recording)
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if (!m_addonCapabilities.bSupportsRecordings)
+  if (!SupportsRecordings())
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   PVR_ERROR retVal(PVR_ERROR_UNKNOWN);
@@ -584,7 +588,7 @@ int CPVRClient::GetTimersAmount(void)
 {
   int iReturn(-EINVAL);
 
-  if (ReadyToUse() && m_addonCapabilities.bSupportsTimers)
+  if (ReadyToUse() && SupportsTimers())
   {
     try { iReturn = m_pStruct->GetTimersAmount(); }
     catch (exception &e) { LogException(e, "GetTimersAmount()"); }
@@ -598,7 +602,7 @@ PVR_ERROR CPVRClient::GetTimers(CPVRTimers *results)
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if (!m_addonCapabilities.bSupportsTimers)
+  if (!SupportsTimers())
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   PVR_ERROR retVal(PVR_ERROR_UNKNOWN);
@@ -624,7 +628,7 @@ PVR_ERROR CPVRClient::AddTimer(const CPVRTimerInfoTag &timer)
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if (!m_addonCapabilities.bSupportsTimers)
+  if (!SupportsTimers())
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   PVR_ERROR retVal(PVR_ERROR_UNKNOWN);
@@ -650,7 +654,7 @@ PVR_ERROR CPVRClient::DeleteTimer(const CPVRTimerInfoTag &timer, bool bForce /* 
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if (!m_addonCapabilities.bSupportsTimers)
+  if (!SupportsTimers())
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   PVR_ERROR retVal(PVR_ERROR_UNKNOWN);
@@ -676,7 +680,7 @@ PVR_ERROR CPVRClient::RenameTimer(const CPVRTimerInfoTag &timer, const CStdStrin
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if (!m_addonCapabilities.bSupportsTimers)
+  if (!SupportsTimers())
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   PVR_ERROR retVal(PVR_ERROR_UNKNOWN);
@@ -702,7 +706,7 @@ PVR_ERROR CPVRClient::UpdateTimer(const CPVRTimerInfoTag &timer)
   if (!ReadyToUse())
     return PVR_ERROR_NOT_POSSIBLE;
 
-  if (!m_addonCapabilities.bSupportsTimers)
+  if (!SupportsTimers())
     return PVR_ERROR_NOT_IMPLEMENTED;
 
   PVR_ERROR retVal(PVR_ERROR_UNKNOWN);
@@ -723,9 +727,10 @@ PVR_ERROR CPVRClient::UpdateTimer(const CPVRTimerInfoTag &timer)
   return retVal;
 }
 
-bool CPVRClient::OpenLiveStream(const CPVRChannel &channel)
+bool CPVRClient::OpenStream(const CPVRChannel &channel)
 {
   bool bReturn(false);
+  CloseStream();
 
   if (CanPlayChannel(channel))
   {
@@ -741,57 +746,125 @@ bool CPVRClient::OpenLiveStream(const CPVRChannel &channel)
     }
   }
 
+  if (bReturn)
+  {
+    CSingleLock lock(m_critSection);
+    m_playingChannel      = channel;
+    m_bIsPlayingTV        = true;
+    m_bIsPlayingRecording = false;
+  }
+
   return bReturn;
 }
 
-void CPVRClient::CloseLiveStream(void)
+bool CPVRClient::OpenStream(const CPVRRecording &recording)
 {
-  if (ReadyToUse())
+  bool bReturn(false);
+  CloseStream();
+
+  if (ReadyToUse() && SupportsRecordings())
+  {
+    try
+    {
+      PVR_RECORDING tag;
+      WriteClientRecordingInfo(recording, tag);
+      bReturn = m_pStruct->OpenRecordedStream(tag);
+    }
+    catch (exception &e)
+    {
+      LogException(e, "OpenRecordedStream()");
+    }
+  }
+
+  if (bReturn)
+  {
+    CSingleLock lock(m_critSection);
+    m_playingRecording    = recording;
+    m_bIsPlayingTV        = false;
+    m_bIsPlayingRecording = true;
+  }
+
+  return bReturn;
+}
+
+void CPVRClient::CloseStream(void)
+{
+  if (IsPlayingLiveStream())
   {
     try { m_pStruct->CloseLiveStream(); }
     catch (exception &e) { LogException(e, "CloseLiveStream()"); }
+
+    CSingleLock lock(m_critSection);
+    m_bIsPlayingTV = false;
+  }
+  else if (IsPlayingRecording())
+  {
+    try { return m_pStruct->CloseRecordedStream(); }
+    catch (exception &e) { LogException(e, "CloseRecordedStream()"); }
+
+    CSingleLock lock(m_critSection);
+    m_bIsPlayingRecording = false;
   }
 }
 
-int CPVRClient::ReadLiveStream(void* lpBuf, int64_t uiBufSize)
+int CPVRClient::ReadStream(void* lpBuf, int64_t uiBufSize)
 {
-  if (ReadyToUse())
+  if (IsPlayingLiveStream())
   {
     try { return m_pStruct->ReadLiveStream((unsigned char *)lpBuf, (int)uiBufSize); }
     catch (exception &e) { LogException(e, "ReadLiveStream()"); }
   }
-
+  else if (IsPlayingRecording())
+  {
+    try { return m_pStruct->ReadRecordedStream((unsigned char *)lpBuf, (int)uiBufSize); }
+    catch (exception &e) { LogException(e, "ReadRecordedStream()"); }
+  }
   return -EINVAL;
 }
 
-int64_t CPVRClient::SeekLiveStream(int64_t iFilePosition, int iWhence/* = SEEK_SET*/)
+int64_t CPVRClient::SeekStream(int64_t iFilePosition, int iWhence/* = SEEK_SET*/)
 {
-  if (ReadyToUse())
+  if (IsPlayingLiveStream())
   {
     try { return m_pStruct->SeekLiveStream(iFilePosition, iWhence); }
     catch (exception &e) { LogException(e, "SeekLiveStream()"); }
   }
-
-  return -EINVAL;
-}
-
-int64_t CPVRClient::PositionLiveStream(void)
-{
-  if (ReadyToUse())
+  else if (IsPlayingRecording())
   {
-    try { return m_pStruct->PositionLiveStream(); }
-    catch (exception &e) { LogException(e, "PositionLiveStream()"); }
+    try { return m_pStruct->SeekRecordedStream(iFilePosition, iWhence); }
+    catch (exception &e) { LogException(e, "SeekRecordedStream()"); }
   }
 
   return -EINVAL;
 }
 
-int64_t CPVRClient::LengthLiveStream(void)
+int64_t CPVRClient::GetStreamPosition(void)
 {
-  if (ReadyToUse())
+  if (IsPlayingLiveStream())
+  {
+    try { return m_pStruct->PositionLiveStream(); }
+    catch (exception &e) { LogException(e, "PositionLiveStream()"); }
+  }
+  else if (IsPlayingRecording())
+  {
+    try { return m_pStruct->PositionRecordedStream(); }
+    catch (exception &e) { LogException(e, "PositionRecordedStream()"); }
+  }
+
+  return -EINVAL;
+}
+
+int64_t CPVRClient::GetStreamLength(void)
+{
+  if (IsPlayingLiveStream())
   {
     try { return m_pStruct->LengthLiveStream(); }
     catch (exception &e) { LogException(e, "LengthLiveStream()"); }
+  }
+  else if (IsPlayingRecording())
+  {
+    try { return m_pStruct->LengthRecordedStream(); }
+    catch (exception &e) { LogException(e, "LengthRecordedStream()"); }
   }
 
   return -EINVAL;
@@ -799,7 +872,7 @@ int64_t CPVRClient::LengthLiveStream(void)
 
 int CPVRClient::GetCurrentClientChannel(void)
 {
-  if (ReadyToUse())
+  if (IsPlayingLiveStream())
   {
     try { return m_pStruct->GetCurrentClientChannel(); }
     catch (exception &e) { LogException(e, "GetCurrentClientChannel()"); }
@@ -810,20 +883,28 @@ int CPVRClient::GetCurrentClientChannel(void)
 
 bool CPVRClient::SwitchChannel(const CPVRChannel &channel)
 {
-  if (CanPlayChannel(channel))
+  bool bSwitched(false);
+
+  if (IsPlayingLiveStream() && CanPlayChannel(channel))
   {
     PVR_CHANNEL tag;
     WriteClientChannelInfo(channel, tag);
-    try { return m_pStruct->SwitchChannel(tag); }
+    try { bSwitched = m_pStruct->SwitchChannel(tag); }
     catch (exception &e) { LogException(e, "SwitchChannel()"); }
   }
 
-  return false;
+  if (bSwitched)
+  {
+    CSingleLock lock(m_critSection);
+    m_playingChannel = channel;
+  }
+
+  return bSwitched;
 }
 
 bool CPVRClient::SignalQuality(PVR_SIGNAL_STATUS &qualityinfo)
 {
-  if (ReadyToUse())
+  if (IsPlayingLiveStream())
   {
     try
     {
@@ -859,76 +940,9 @@ CStdString CPVRClient::GetLiveStreamURL(const CPVRChannel &channel)
   return StringUtils::EmptyString;
 }
 
-bool CPVRClient::OpenRecordedStream(const CPVRRecording &recording)
-{
-  if (ReadyToUse() && m_addonCapabilities.bSupportsRecordings)
-  {
-    PVR_RECORDING tag;
-    WriteClientRecordingInfo(recording, tag);
-
-    try { return m_pStruct->OpenRecordedStream(tag); }
-    catch (exception &e) { LogException(e, "OpenRecordedStream()"); }
-  }
-
-  return false;
-}
-
-void CPVRClient::CloseRecordedStream(void)
-{
-  if (ReadyToUse() && m_addonCapabilities.bSupportsRecordings)
-  {
-    try { return m_pStruct->CloseRecordedStream(); }
-    catch (exception &e) { LogException(e, "CloseRecordedStream()"); }
-  }
-}
-
-int CPVRClient::ReadRecordedStream(void* lpBuf, int64_t uiBufSize)
-{
-  if (ReadyToUse() && m_addonCapabilities.bSupportsRecordings)
-  {
-    try { return m_pStruct->ReadRecordedStream((unsigned char *)lpBuf, (int)uiBufSize); }
-    catch (exception &e) { LogException(e, "ReadRecordedStream()"); }
-  }
-
-  return -EINVAL;
-}
-
-int64_t CPVRClient::SeekRecordedStream(int64_t iFilePosition, int iWhence/* = SEEK_SET*/)
-{
-  if (ReadyToUse() && m_addonCapabilities.bSupportsRecordings)
-  {
-    try { return m_pStruct->SeekRecordedStream(iFilePosition, iWhence); }
-    catch (exception &e) { LogException(e, "SeekRecordedStream()"); }
-  }
-
-  return -EINVAL;
-}
-
-int64_t CPVRClient::PositionRecordedStream()
-{
-  if (ReadyToUse() && m_addonCapabilities.bSupportsRecordings)
-  {
-    try { return m_pStruct->PositionRecordedStream(); }
-    catch (exception &e) { LogException(e, "PositionRecordedStream()"); }
-  }
-
-  return -EINVAL;
-}
-
-int64_t CPVRClient::LengthRecordedStream(void)
-{
-  if (ReadyToUse() && m_addonCapabilities.bSupportsRecordings)
-  {
-    try { return m_pStruct->LengthRecordedStream(); }
-    catch (exception &e) { LogException(e, "LengthRecordedStream()"); }
-  }
-
-  return -EINVAL;
-}
-
 PVR_ERROR CPVRClient::GetStreamProperties(PVR_STREAM_PROPERTIES *props)
 {
-  if (!ReadyToUse())
+  if (!IsPlaying())
     return PVR_ERROR_NOT_POSSIBLE;
 
   try { return m_pStruct->GetStreamProperties(props); }
@@ -939,7 +953,7 @@ PVR_ERROR CPVRClient::GetStreamProperties(PVR_STREAM_PROPERTIES *props)
 
 void CPVRClient::DemuxReset(void)
 {
-  if (ReadyToUse() && m_addonCapabilities.bHandlesDemuxing)
+  if (IsPlaying() && HandlesDemuxing())
   {
     try { m_pStruct->DemuxReset(); }
     catch (exception &e) { LogException(e, "DemuxReset()"); }
@@ -948,7 +962,7 @@ void CPVRClient::DemuxReset(void)
 
 void CPVRClient::DemuxAbort(void)
 {
-  if (ReadyToUse() && m_addonCapabilities.bHandlesDemuxing)
+  if (IsPlaying() && HandlesDemuxing())
   {
     try { m_pStruct->DemuxAbort(); }
     catch (exception &e) { LogException(e, "DemuxAbort()"); }
@@ -957,7 +971,7 @@ void CPVRClient::DemuxAbort(void)
 
 void CPVRClient::DemuxFlush(void)
 {
-  if (ReadyToUse() && m_addonCapabilities.bHandlesDemuxing)
+  if (IsPlaying() && HandlesDemuxing())
   {
     try { m_pStruct->DemuxFlush(); }
     catch (exception &e) { LogException(e, "DemuxFlush()"); }
@@ -966,7 +980,7 @@ void CPVRClient::DemuxFlush(void)
 
 DemuxPacket* CPVRClient::DemuxRead(void)
 {
-  if (ReadyToUse() && m_addonCapabilities.bHandlesDemuxing)
+  if (IsPlaying() && HandlesDemuxing())
   {
     try { return m_pStruct->DemuxRead(); }
     catch (exception &e) { LogException(e, "DemuxRead()"); }
@@ -1035,6 +1049,125 @@ void CPVRClient::LogException(const exception &e, const char *strFunctionName)
 bool CPVRClient::CanPlayChannel(const CPVRChannel &channel) const
 {
   return (ReadyToUse() &&
-           ((m_addonCapabilities.bSupportsTV && !channel.IsRadio()) ||
-            (m_addonCapabilities.bSupportsRadio && channel.IsRadio())));
+          HandlesInputStream() &&
+          ((SupportsTV() && !channel.IsRadio()) ||
+           (SupportsRadio() && channel.IsRadio())));
+}
+
+bool CPVRClient::SupportsEPG(void) const
+{
+  CSingleLock lock(m_critSection);
+  return m_addonCapabilities.bSupportsEPG;
+}
+
+bool CPVRClient::SupportsTV(void) const
+{
+  CSingleLock lock(m_critSection);
+  return m_addonCapabilities.bSupportsTV;
+}
+
+bool CPVRClient::SupportsRadio(void) const
+{
+  CSingleLock lock(m_critSection);
+  return m_addonCapabilities.bSupportsRadio;
+}
+
+bool CPVRClient::SupportsRecordings(void) const
+{
+  CSingleLock lock(m_critSection);
+  return m_addonCapabilities.bSupportsRecordings;
+}
+
+bool CPVRClient::SupportsTimers(void) const
+{
+  CSingleLock lock(m_critSection);
+  return m_addonCapabilities.bSupportsTimers;
+}
+
+bool CPVRClient::SupportsChannelGroups(void) const
+{
+  CSingleLock lock(m_critSection);
+  return m_addonCapabilities.bSupportsChannelGroups;
+}
+
+bool CPVRClient::SupportsChannelScan(void) const
+{
+  CSingleLock lock(m_critSection);
+  return m_addonCapabilities.bSupportsChannelScan;
+}
+
+bool CPVRClient::SupportsRecordingFolders(void) const
+{
+  CSingleLock lock(m_critSection);
+  return m_addonCapabilities.bSupportsRecordingFolders;
+}
+
+bool CPVRClient::HandlesInputStream(void) const
+{
+  CSingleLock lock(m_critSection);
+  return m_addonCapabilities.bHandlesInputStream;
+}
+
+bool CPVRClient::HandlesDemuxing(void) const
+{
+  CSingleLock lock(m_critSection);
+  return m_addonCapabilities.bHandlesDemuxing;
+}
+
+bool CPVRClient::IsPlayingLiveStream(void) const
+{
+  CSingleLock lock(m_critSection);
+  return ReadyToUse() && m_bIsPlayingTV;
+}
+
+bool CPVRClient::IsPlayingLiveTV(void) const
+{
+  CSingleLock lock(m_critSection);
+  return ReadyToUse() && m_bIsPlayingTV && !m_playingChannel.IsRadio();
+}
+
+bool CPVRClient::IsPlayingLiveRadio(void) const
+{
+  CSingleLock lock(m_critSection);
+  return ReadyToUse() && m_bIsPlayingTV && m_playingChannel.IsRadio();
+}
+
+bool CPVRClient::IsPlayingEncryptedChannel(void) const
+{
+  CSingleLock lock(m_critSection);
+  return ReadyToUse() && m_bIsPlayingTV && m_playingChannel.IsEncrypted();
+}
+
+bool CPVRClient::IsPlayingRecording(void) const
+{
+  CSingleLock lock(m_critSection);
+  return ReadyToUse() && m_bIsPlayingRecording;
+}
+
+bool CPVRClient::IsPlaying(void) const
+{
+  return IsPlayingLiveStream() ||
+         IsPlayingRecording();
+}
+
+bool CPVRClient::GetPlayingChannel(CPVRChannel &channel) const
+{
+  CSingleLock lock(m_critSection);
+  if (ReadyToUse() && m_bIsPlayingTV)
+  {
+    channel = m_playingChannel;
+    return true;
+  }
+  return false;
+}
+
+bool CPVRClient::GetPlayingRecording(CPVRRecording &recording) const
+{
+  CSingleLock lock(m_critSection);
+  if (ReadyToUse() && m_bIsPlayingRecording)
+  {
+    recording = m_playingRecording;
+    return true;
+  }
+  return false;
 }

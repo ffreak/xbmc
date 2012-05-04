@@ -103,31 +103,20 @@ int CPVRRecording::GetDuration() const
 
 bool CPVRRecording::Delete(void)
 {
-  PVR_ERROR error;
-  if (!g_PVRClients->DeleteRecording(*this, &error))
-  {
-    DisplayError(error);
-    return false;
-  }
-
-  return true;
+  return DisplayError(g_PVRClients->DeleteRecording(*this));
 }
 
 bool CPVRRecording::Rename(const CStdString &strNewName)
 {
-  PVR_ERROR error;
   m_strTitle.Format("%s", strNewName);
-  if (!g_PVRClients->RenameRecording(*this, &error))
-  {
-    DisplayError(error);
-    return false;
-  }
-
-  return true;
+  return DisplayError(g_PVRClients->RenameRecording(*this));
 }
 
-void CPVRRecording::DisplayError(PVR_ERROR err) const
+bool CPVRRecording::DisplayError(PVR_ERROR err) const
 {
+  if (err == PVR_ERROR_NO_ERROR)
+    return true;
+
   if (err == PVR_ERROR_SERVER_ERROR)
     CGUIDialogOK::ShowAndGetInput(19033,19111,19110,0); /* print info dialog "Server error!" */
   else if (err == PVR_ERROR_NOT_SYNC)
@@ -137,7 +126,7 @@ void CPVRRecording::DisplayError(PVR_ERROR err) const
   else
     CGUIDialogOK::ShowAndGetInput(19033,19147,19110,0); /* print info dialog "Unknown error!" */
 
-  return;
+  return false;
 }
 
 void CPVRRecording::Update(const CPVRRecording &tag)
